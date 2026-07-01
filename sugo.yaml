@@ -1,0 +1,21 @@
+version: 1
+name: sugo
+tasks:
+  run.frontend:
+    folder: /home/jaison/code/projects/sugo/frontend
+    command: npm run dev
+    type: service
+    ready:
+      kind: port
+      port: 5173
+    dependsOn: []
+    logRules: []
+  run.backend:
+    folder: /home/jaison/code/projects/sugo/server
+    command: source venv/bin/activate && uvicorn app.main:app --reload
+    type: service
+    ready:
+      kind: port
+      port: 8000
+    dependsOn: []
+    logRules: []

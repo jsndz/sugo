@@ -1,227 +1,129 @@
-# Project: Floorplan → Structured SVG Platform
+# ⚡ Sugo
 
-Goal:
-Upload colored floorplans and generate optimized editable SVGs.
+**Sugo** is a high-performance image-to-SVG vectorization engine. It provides a React frontend and a FastAPI backend with multiple vectorization pipelines ranging from color-aware path tracing to structured geometry reconstruction for architectural floorplans.
 
-Tech stack:
+---
 
-* Frontend: React + TypeScript
-* Backend: FastAPI
-* CV: OpenCV
-* Vectorization: VTracer
-* Geometry: Shapely
-* SVG optimization: SVGO
+## 🚀 Key Features & Vectorization Pipelines
 
-Architecture:
+Sugo implements three distinct processing pipelines for various vectorization needs:
 
-```text id="k2mjlwm"
-React Frontend
-    ↓
-FastAPI Backend
-    ↓
-Image Processing Pipeline
-    ├── preprocess
-    ├── segmentation
-    ├── wall detection
-    ├── vectorization
-    ├── svg cleanup
-    └── svg export
+1. **Potrace (Local VTracer)**:
+   - Optimized for single-color shapes or silhouette vectorization.
+   - Includes image preprocessing: a bilateral filter to reduce noise while preserving edges, followed by a sharpening filter before tracing.
+   
+2. **VTracer**:
+   - A modern, color-aware tracing pipeline.
+   - Converts raster colors into corresponding overlapping SVG paths, preserving multi-color details.
+
+3. **Production (Geometry Reconstruction)**:
+   - Specifically optimized for floorplans and architectural lines.
+   - **Algorithm Flow**:
+     1. Preprocessing (bilateral filter + sharpening + grayscale conversion).
+     2. Edge detection using the Canny algorithm.
+     3. Wall detection using the Probabilistic Hough Line Transform.
+     4. Geometry snapping to near-horizontal and near-vertical constraints.
+     5. Reconstructing wall boundaries using [Shapely](https://shapely.readthedocs.io/).
+     6. Exporting a structured SVG grouping wall elements under `<g id="walls">`.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS 4
+- **Backend**: FastAPI + Uvicorn
+- **Computer Vision & Graphics**: OpenCV (Python), Shapely, svgwrite, VTracer
+
+---
+
+## 📂 Project Structure
+
+- [sugo.yaml](file:///home/jaison/code/projects/sugo/sugo.yaml) - Orchestration configurations for local services
+- [frontend/](file:///home/jaison/code/projects/sugo/frontend) - React web application
+  - [frontend/src/App.tsx](file:///home/jaison/code/projects/sugo/frontend/src/App.tsx) - Main user interface & file upload logic
+  - [frontend/src/main.tsx](file:///home/jaison/code/projects/sugo/frontend/src/main.tsx) - Vite entrypoint
+  - [frontend/package.json](file:///home/jaison/code/projects/sugo/frontend/package.json) - Frontend package details
+- [server/](file:///home/jaison/code/projects/sugo/server) - FastAPI backend
+  - [server/app/main.py](file:///home/jaison/code/projects/sugo/server/app/main.py) - FastAPI application entry & CORS middleware
+  - [server/app/get_svg.py](file:///home/jaison/code/projects/sugo/server/app/get_svg.py) - Custom CV & tracing pipeline algorithms
+
+---
+
+## ⚙️ Installation & Setup
+
+### Prerequisites
+Ensure you have the following installed:
+- [Node.js](https://nodejs.org/) (v18+)
+- [Python](https://www.python.org/) (v3.9+)
+
+### Step-by-Step Setup
+
+1. **Clone the Repository**
+   ```bash
+   git clone <your-repo-url>
+   cd sugo
+   ```
+
+2. **Backend Installation**
+   ```bash
+   cd server
+   python -m venv venv
+   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+   pip install fastapi uvicorn opencv-python numpy svgwrite shapely vtracer python-multipart
+   ```
+
+3. **Frontend Installation**
+   ```bash
+   cd ../frontend
+   npm install
+   ```
+
+---
+
+## 🏃 Running the Application
+
+### Option A: Using the Task Runner
+If you are using a workspace task orchestrator that understands [sugo.yaml](file:///home/jaison/code/projects/sugo/sugo.yaml):
+```bash
+# Runs both services as defined in sugo.yaml
+agy run
 ```
 
-Backend structure:
+### Option B: Manual Startup
 
-```text id="gb48m7"
-/backend
-│
-├── app/
-│   ├── main.py
-│   ├── routes/
-│   │   ├── upload.py
-│   │   ├── process.py
-│   │   └── svg.py
-│   │
-│   ├── services/
-│   │   ├── preprocess.py
-│   │   ├── segment.py
-│   │   ├── walls.py
-│   │   ├── vectorize.py
-│   │   ├── optimize_svg.py
-│   │   └── export_svg.py
-│   │
-│   ├── models/
-│   ├── utils/
-│   └── config.py
-│
-├── uploads/
-├── outputs/
-└── requirements.txt
-```
+1. **Start the FastAPI server**
+   ```bash
+   cd server
+   source venv/bin/activate
+   uvicorn app.main:app --reload
+   ```
+   The backend API will run on [http://localhost:8000](http://localhost:8000).
 
-Frontend structure:
+2. **Start the Vite frontend**
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+   The frontend dev server will start on [http://localhost:5173](http://localhost:5173).
 
-```text id="5u9q0d"
-/frontend
-│
-├── src/
-│   ├── pages/
-│   │   ├── UploadPage.tsx
-│   │   └── EditorPage.tsx
-│   │
-│   ├── components/
-│   │   ├── UploadBox.tsx
-│   │   ├── SvgViewer.tsx
-│   │   ├── Toolbar.tsx
-│   │   ├── LayerPanel.tsx
-│   │   └── ProcessingStatus.tsx
-│   │
-│   ├── api/
-│   └── hooks/
-```
+---
 
-Backend API:
+## 📡 API Reference
 
-```text id="x81r3f"
-POST /upload
-POST /process
-GET  /svg/{id}
-GET  /status/{id}
-```
+### `POST /api/convert`
 
-Pipeline details:
+Uploads an image file to run the conversion pipeline.
 
-1. preprocess.py
-   Tasks:
-
-* resize
-* denoise
-* sharpen
-* adaptive threshold
-* color normalization
-
-OpenCV techniques:
-
-* Gaussian blur
-* morphology
-* Canny edges
-
-2. segment.py
-   Goal:
-   Separate:
-
-* walls
-* rooms
-* labels
-* furniture
-
-Methods:
-
-* HSV segmentation
-* contours
-* connected components
-
-3. walls.py
-   Goal:
-   Extract clean geometry.
-
-Methods:
-
-* Hough line transform
-* contour approximation
-
-Use:
-
-```text id="yo5duw"
-cv2.HoughLinesP()
-cv2.findContours()
-cv2.approxPolyDP()
-```
-
-4. vectorize.py
-   Run VTracer:
-
-```python id="4z3x10"
-subprocess.run([
-  "vtracer",
-  "--input", input_path,
-  "--output", output_path
-])
-```
-
-5. optimize_svg.py
-   Tasks:
-
-* simplify paths
-* merge nearby lines
-* snap corners
-* reduce nodes
-
-Libraries:
-
-* svgpathtools
-* shapely
-
-6. export_svg.py
-   Generate structured SVG:
-
-```xml id="fg8ajg"
-<g id="walls">
-<g id="rooms">
-<g id="labels">
-```
-
-Frontend features:
-
-Upload page:
-
-* drag/drop upload
-* preview image
-* processing controls
-
-Editor page:
-
-* SVG zoom/pan
-* toggle layers
-* download SVG
-* inspect paths
-
-Useful libraries:
-
-* react-svg
-* react-query
-* react-dropzone
-
-Advanced features:
-
-* room labeling
-* OCR
-* furniture detection
-* editable walls
-* DXF export
-* AI room classification
-
-MVP scope:
-
-```text id="vljz3v"
-Upload image
-→ preprocess
-→ VTracer
-→ optimized SVG
-→ preview/download
-```
-
-Production-quality scope:
-
-```text id="yu9sjl"
-semantic segmentation
-→ geometry reconstruction
-→ structured SVG editor
-```
-
-Good learning outcomes:
-
-* CV pipelines
-* backend architecture
-* async processing
-* SVG rendering
-* geometry algorithms
-* production ML/CV workflows
+- **Request**: `multipart/form-data`
+  - `file`: The raster image (PNG, JPG, WEBP).
+- **Response**: `application/json`
+  ```json
+  {
+    "filename": "input.png",
+    "svgs": {
+      "potrace": "<svg>...</svg> or null",
+      "vtracer": "<svg>...</svg> or null",
+      "production": "<svg>...</svg> or null"
+    }
+  }
+  ```
